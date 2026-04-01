@@ -110,11 +110,19 @@ class SummaryGeneration:
    
     async def high_level_element_summary(self):
         results = []
-        
+
+        if not os.path.exists(self.config.summary_path):
+            self.config.console.print('[bold yellow]No community summary found, skipping high level element summary[/bold yellow]')
+            return
+
         with open(self.config.summary_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = json.loads(line)
                 results.append(line)
+
+        if not results:
+            self.config.console.print('[bold yellow]Community summary is empty, skipping high level element summary[/bold yellow]')
+            return
                 
         All_nodes = []
         self.config.tracker.set(len(results),'High Level Element Summary')
@@ -200,7 +208,8 @@ class SummaryGeneration:
         self.config.console.print('[bold green]Graph stored[/bold green]')
         
     def delete_community_cache(self):
-        os.remove(self.config.summary_path)
+        if os.path.exists(self.config.summary_path):
+            os.remove(self.config.summary_path)
         
     def store_high_level_elements(self):
         

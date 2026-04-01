@@ -5,6 +5,7 @@ import yaml
 import os
 import json
 import sys
+import streamlit.components.v1 as components
 
 from NodeRAG.utils import LazyImport
 
@@ -247,9 +248,13 @@ def sidebar():
             Enable_Search = st.toggle("Search Engine", value=True)
             
             if Enable_Search and not st.session_state.settings.get('engine_running'):
-                st.session_state.settings['search_engine'] = NGSearch(NGConfig(all_config()))
-                st.session_state.settings['engine_running'] = True
-                st.write("Search Engine is running")
+                try:
+                    st.session_state.settings['search_engine'] = NGSearch(NGConfig(all_config()))
+                    st.session_state.settings['engine_running'] = True
+                    st.write("Search Engine is running")
+                except ValueError as e:
+                    st.error(f"⚠️ Cannot start search engine: {e}")
+                    Enable_Search = False
                 if not st.session_state.indices:
                     st.session_state.indices = json.load(open(os.path.join(st.session_state.config['main_folder'], 'info/indices.json'), 'r'))
                 
@@ -654,5 +659,31 @@ else:
     load_config(st.session_state.original_config_path)
 display_header()
 sidebar()
-display_chat_history()
-handle_user_input()
+
+tab_chat, tab_vis = st.tabs(["💬 Chat", "🕸️ Graph Visualization"])
+
+with tab_chat:
+    display_chat_history()
+    handle_user_input()
+
+with tab_vis:
+    vis_path = os.path.join(st.session_state.config['main_folder'], 'index.html')
+    if os.path.exists(vis_path):
+        if 'vis_html' not in st.session_state:
+            st.session_state.vis_html = None
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            if st.button("Load Graph"):
+                with open(vis_path, 'r', encoding='utf-8') as f:
+                    st.session_state.vis_html = f.read()
+        with col2:
+            if st.session_state.vis_html:
+                if st.button("Unload Graph"):
+                    st.session_state.vis_html = None
+        if st.session_state.vis_html:
+            components.html(st.session_state.vis_html, height=800, scrolling=True)
+        else:
+            st.info("Click **Load Graph** to render the visualization.")
+    else:
+        st.info("No visualization found. Run the following command first:")
+        st.code(f'python -m NodeRAG.Vis.html -f "{st.session_state.config["main_folder"]}"')

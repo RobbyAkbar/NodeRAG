@@ -15,9 +15,10 @@ class sparse_PPR():
         self.trans_matrix = self.generate_sparse_trasition_matrix()
         
     def generate_sparse_trasition_matrix(self):
-        
-        
-        
+
+        if self.graph.number_of_nodes() == 0:
+            raise ValueError("Graph has no nodes. Please build the index first before searching.")
+
         adjaceny_matrix = nx.adjacency_matrix(self.graph,weight = self.weight)
         adjaceny_matrix = (adjaceny_matrix+adjaceny_matrix.T)/2
 

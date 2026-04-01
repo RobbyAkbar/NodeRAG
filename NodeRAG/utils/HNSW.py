@@ -34,6 +34,8 @@ class HNSW:
             return None
     
     def add_nodes(self, nodes: List[Tuple[str, np.ndarray]]):
+        if not nodes:
+            return
         current_length = len(self.id_map)
         id_list = []
         embedding_list = []
@@ -42,8 +44,9 @@ class HNSW:
             self.id_map[new_id] = node_id
             id_list.append(new_id)
             embedding_list.append(embedding)
-        self.hnsw.resize_index(len(id_list)+current_length)
-        self.hnsw.add_items(np.array(embedding_list).astype(np.float32),id_list)
+        new_total = len(id_list) + current_length
+        self.hnsw.resize_index(max(new_total, 1))
+        self.hnsw.add_items(np.array(embedding_list).astype(np.float32), id_list)
         
     def search(self,query:np.ndarray,HNSW_results:int=None):
         
@@ -95,7 +98,7 @@ class HNSW:
             self.hnsw.load_index(self.config.HNSW_path)
         
         else:
-            self.hnsw.init_index(max_elements=len(self.id_map), ef_construction=self.config._ef, M=self.config._m)
+            self.hnsw.init_index(max_elements=max(len(self.id_map), 1), ef_construction=self.config._ef, M=self.config._m)
 
             
         

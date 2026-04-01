@@ -201,22 +201,29 @@ class NodeRag():
                 self.console.input("[bold red]Invalid input. Please enter 'y' or 'n'.[/bold red]")
                 
     def update_state_tree(self):
-        
-        self.console.clear()
-        tree = Tree("[bold cyan]🚀 Processing Pipeline[/bold cyan]")
-        index = self.state_sequence.index(self.Current_state)
-        
-        for i in range(index+1):
-            tree.add(f"[green]{self.state_sequence[i].value} Done[/green]")
-        
-        self.console.print(tree)
+        if self.web_ui:
+            return
+        try:
+            self.console.clear()
+            tree = Tree("[bold cyan]🚀 Processing Pipeline[/bold cyan]")
+            index = self.state_sequence.index(self.Current_state)
+
+            for i in range(index+1):
+                tree.add(f"[green]{self.state_sequence[i].value} Done[/green]")
+
+            self.console.print(tree)
+        except OSError:
+            pass
     
     async def error_handler(self):
         
         self.update_state_tree()
         
         if self.Error_type == State.ERROR_LOG or self.Error_type == State.ERROR:
-            self.console.print("[bold red]Error logged. Rerun the pipeline from the current state.[/bold red]")
+            try:
+                self.console.print("[bold red]Error logged. Rerun the pipeline from the current state.[/bold red]")
+            except OSError:
+                pass
         
             try:
                 await self.state_pipeline_map[self.Current_state](self.config).main()
@@ -227,8 +234,10 @@ class NodeRag():
                 raise f'Error happened in {self.Current_state} pipeline, please check the error log.{e}'
            
         if self.Error_type == State.ERROR_CACHE:
-        
-            self.console.print("[bold red]Error cached. Rerun the pipeline from the current state.[/bold red]")
+            try:
+                self.console.print("[bold red]Error cached. Rerun the pipeline from the current state.[/bold red]")
+            except OSError:
+                pass
         
             try:
                 await self.state_pipeline_map[self.Current_state](self.config).rerun()
