@@ -52,19 +52,32 @@ class tiktoken_counter(token_counter):
 
 def get_token_counter(model_name:str) -> token_counter:
 
-    
     model_name = model_name.lower()
-    
+
+    # OpenRouter slugs are "provider/model-name" — strip the prefix
+    if '/' in model_name:
+        model_name = model_name.split('/', 1)[1]
+
     if 'gpt' in model_name:
         return tiktoken_counter(model_name)
     elif 'gemini' in model_name:
         token = tiktoken_counter('gpt-4o')
         token.token_limit_bound = 1280000
         return token
+    elif 'claude' in model_name:
+        # Claude models use the same token budget as GPT-4o for estimation
+        token = tiktoken_counter('gpt-4o')
+        token.token_limit_bound = 200000
+        return token
+    elif 'llama' in model_name or 'mistral' in model_name or 'mixtral' in model_name:
+        token = tiktoken_counter('gpt-4o')
+        token.token_limit_bound = 128000
+        return token
     # elif 'deepseek' in model_name:
     #     return deepseek_counter(model_name)
     else:
-        raise ValueError(f"Unsupported model {model_name}")
+        # Fallback: use gpt-4o tokenizer as a reasonable approximation
+        return tiktoken_counter('gpt-4o')
 
 
     

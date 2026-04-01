@@ -24,7 +24,7 @@ from ..LLM.LLM_base import (
 
 from openai import (
     RateLimitError,
-    Timeout,
+    APITimeoutError,
     APIConnectionError,
 )
 
@@ -106,7 +106,7 @@ class OPENAI(LLM):
     
     
     @backoff.on_exception(backoff.expo, 
-                          [RateLimitError, Timeout, APIConnectionError,JSONDecodeError], 
+                          [RateLimitError, APITimeoutError, APIConnectionError,JSONDecodeError], 
                           max_time=30, 
                           max_tries=4)
     def _create_completion(self, messages, response_format=None):
@@ -131,7 +131,7 @@ class OPENAI(LLM):
 
         
     @backoff.on_exception(backoff.expo, 
-                          [RateLimitError, Timeout, APIConnectionError,JSONDecodeError], 
+                          [RateLimitError, APITimeoutError, APIConnectionError,JSONDecodeError], 
                           max_time=30, 
                           max_tries=4)
     async def _create_completion_async(self, messages, response_format=None):
@@ -197,6 +197,145 @@ class OPENAI(LLM):
         return messages
     
 
+class OpenRouter(LLM):
+
+    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+    def __init__(self,
+                 model_name: str,
+                 api_keys: str | None,
+                 Config: ModelConfig | None = None) -> None:
+
+        super().__init__(model_name, api_keys, Config)
+
+        if self.api_keys is None:
+            self.api_keys = os.getenv("OPENROUTER_API_KEY")
+
+        self.client = OpenAI(
+            api_key=self.api_keys,
+            base_url=self.OPENROUTER_BASE_URL,
+        )
+        self.client_async = AsyncOpenAI(
+            api_key=self.api_keys,
+            base_url=self.OPENROUTER_BASE_URL,
+        )
+        self.config = self.extract_config(Config)
+
+    def extract_config(self, config: ModelConfig) -> ModelConfig:
+        return {
+            "max_tokens": config.get("max_tokens", 10000),
+            "temperature": config.get("temperature", 0.0),
+        }
+
+    @backoff.on_exception(backoff.expo,
+                          [RateLimitError, APITimeoutError, APIConnectionError, JSONDecodeError],
+                          max_time=30,
+                          max_tries=4)
+    def _create_completion(self, messages, response_format=None):
+        params = {
+            "model": self.model_name,
+            "messages": messages,
+            **self.config,
+        }
+        if response_format:
+            params["response_format"] = response_format
+            response = self.client.beta.chat.completions.parse(**params)
+            json_response = response.choices[0].message.parsed.model_dump_json()
+            return json.loads(json_response)
+        else:
+            response = self.client.chat.completions.create(**params)
+            return response.choices[0].message.content.strip()
+
+    @backoff.on_exception(backoff.expo,
+                          [RateLimitError, APITimeoutError, APIConnectionError, JSONDecodeError],
+                          max_time=30,
+                          max_tries=4)
+    async def _create_completion_async(self, messages, response_format=None):
+        params = {
+            "model": self.model_name,
+            "messages": messages,
+            **self.config,
+        }
+        if response_format:
+            params["response_format"] = response_format
+            response = await self.client_async.beta.chat.completions.parse(**params)
+            json_response = response.choices[0].message.parsed.model_dump_json()
+            return json.loads(json_response)
+        else:
+            response = await self.client_async.chat.completions.create(**params)
+            return response.choices[0].message.content.strip()
+
+    @error_handler
+    def API_client(self, input: LLM_message) -> LLMOutput:
+        messages = self.messages(input)
+        return self._create_completion(messages, input.get('response_format'))
+
+    @error_handler_async
+    async def API_client_async(self, input: LLM_message) -> LLMOutput:
+        messages = self.messages(input)
+        return await self._create_completion_async(messages, input.get('response_format'))
+
+    def stream_chat(self, input: LLM_message):
+        messages = self.messages(input)
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            stream=True,
+        )
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+
+    def messages(self, input: LLM_message) -> OpenAI_message:
+        messages = []
+        if input.get("system_prompt"):
+            messages.append({"role": "system", "content": input["system_prompt"]})
+        messages.append({"role": "user", "content": [{"type": "text", "text": input["query"]}]})
+        return messages
+
+
+class OpenRouter_Embedding(LLM):
+
+    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+    def __init__(self,
+                 model_name: str,
+                 api_keys: str | None,
+                 Config: ModelConfig | None) -> None:
+
+        super().__init__(model_name, api_keys, Config)
+
+        if api_keys is None:
+            api_keys = os.getenv("OPENROUTER_API_KEY")
+
+        self.client = OpenAI(api_key=api_keys, base_url=self.OPENROUTER_BASE_URL)
+        self.client_async = AsyncOpenAI(api_key=api_keys, base_url=self.OPENROUTER_BASE_URL)
+
+    @backoff.on_exception(backoff.expo,
+                          [RateLimitError, APITimeoutError, APIConnectionError],
+                          max_time=30,
+                          max_tries=4)
+    def _create_embedding(self, input: Embedding_message) -> Embedding_output:
+        response = self.client.embeddings.create(model=self.model_name, input=input)
+        return [res.embedding for res in response.data]
+
+    @error_handler
+    def API_client(self, input: Embedding_message) -> Embedding_output:
+        return self._create_embedding(input)
+
+    @backoff.on_exception(backoff.expo,
+                          [RateLimitError, APITimeoutError, APIConnectionError],
+                          max_time=30,
+                          max_tries=4)
+    async def _create_embedding_async(self, input: Embedding_message) -> Embedding_output:
+        response = await self.client_async.embeddings.create(model=self.model_name, input=input)
+        return [res.embedding for res in response.data]
+
+    @error_handler_async
+    async def API_client_async(self, input: Embedding_message) -> Embedding_output:
+        return await self._create_embedding_async(input)
+
+
 class OpenAI_Embedding(LLM):
     
     def __init__(self, 
@@ -212,7 +351,7 @@ class OpenAI_Embedding(LLM):
         self.client_async = AsyncOpenAI(api_key=api_keys)
     
     @backoff.on_exception(backoff.expo, 
-                          [RateLimitError, Timeout, APIConnectionError], 
+                          [RateLimitError, APITimeoutError, APIConnectionError], 
                           max_time=30, 
                           max_tries=4)
     def _create_embedding(self, input: Embedding_message) -> Embedding_output:
@@ -229,7 +368,7 @@ class OpenAI_Embedding(LLM):
         return response
     
     @backoff.on_exception(backoff.expo, 
-                          [RateLimitError, Timeout, APIConnectionError], 
+                          [RateLimitError, APITimeoutError, APIConnectionError], 
                           max_time=30, 
                           max_tries=4)
     async def _create_embedding_async(self, input: Embedding_message) -> Embedding_output:

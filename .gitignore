@@ -6,3 +6,6 @@ __pycache__/
 *.egg-info/
 dist/
 lib/
+
+# Ignore all CLAUDE.md files
+**/CLAUDE.md

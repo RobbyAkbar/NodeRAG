@@ -2,17 +2,17 @@
 # AI Model Configuration
 #==============================================================================
 model_config:
-  service_provider: openai            # AI service provider (e.g., openai, gemini)
-  model_name: gpt-4o-mini            # Model name for text generation
-  api_keys: ~  # Your API key (optional)
+  service_provider: openrouter            # AI service provider (e.g., openai, gemini, openrouter)
+  model_name: openai/gpt-4o-mini            # Model name for text generation
+  api_keys: YOUR_API_KEY_HERE
   temperature: 0                # Temperature parameter for text generation
   max_tokens: 10000                  # Maximum tokens to generate
   rate_limit: 40                      # API rate limit (requests per second)
 
 embedding_config:
-  service_provider: openai_embedding  # Embedding service provider
-  embedding_model_name: text-embedding-3-small  # Model name for text embeddings
-  api_keys: ~  # Your API key (optional)
+  service_provider: openrouter_embedding  # Embedding service provider
+  embedding_model_name: openai/text-embedding-3-small  # Model name for text embeddings
+  api_keys: YOUR_API_KEY_HERE
   rate_limit: 20                      # Rate limit for embedding requests
 
 

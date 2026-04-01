@@ -64,6 +64,16 @@ def load_config(path):
         st.session_state.model_config = all_config['model_config']
         st.session_state.embedding_config = all_config['embedding_config']
 
+    # If api_keys are null, fall back to the original Node_config.yaml
+    original_path = st.session_state.original_config_path
+    if path != original_path and os.path.exists(original_path):
+        with open(original_path, 'r') as f:
+            original = yaml.safe_load(f)
+        if not st.session_state.model_config.get('api_keys'):
+            st.session_state.model_config['api_keys'] = original.get('model_config', {}).get('api_keys')
+        if not st.session_state.embedding_config.get('api_keys'):
+            st.session_state.embedding_config['api_keys'] = original.get('embedding_config', {}).get('api_keys')
+
 def all_config():
     """Get all the config from the session state"""
     return {
@@ -366,16 +376,20 @@ def sidebar():
         
         with st.expander("🤖 Model & Embedding Settings", expanded=False):
             st.subheader("Model settings")
+            _model_providers = ["openai", "gemini", "openrouter"]
+            _cur_provider = st.session_state.model_config.get('service_provider', 'openai')
+            if _cur_provider not in _model_providers:
+                _cur_provider = 'openai'
             st.session_state.model_config['service_provider'] = st.selectbox(
                 "Service Provider",
-                ["openai",'gemini'],
-                index=["openai",'gemini'].index(st.session_state.model_config['service_provider']),
+                _model_providers,
+                index=_model_providers.index(_cur_provider),
                 help="AI service provider"
             )
             if st.session_state.model_config['service_provider'] == 'openai':
                 st.session_state.model_config['model_name'] = st.selectbox(
                     "Language Model",
-                    ["gpt-4o-mini","gpt-4o"],
+                    ["gpt-4o-mini", "gpt-4o"],
                     help="Select the language model to use"
                 )
             elif st.session_state.model_config['service_provider'] == 'gemini':
@@ -384,8 +398,15 @@ def sidebar():
                     ["gemini-2.0-flash-lite-preview-02-05"],
                     help="Select the language model to use"
                 )
+            elif st.session_state.model_config['service_provider'] == 'openrouter':
+                st.session_state.model_config['model_name'] = st.text_input(
+                    "Language Model",
+                    value=st.session_state.model_config.get('model_name', 'openai/gpt-4o-mini'),
+                    help="OpenRouter model slug (e.g. openai/gpt-4o-mini, anthropic/claude-3.5-sonnet)"
+                )
             
-            st.markdown(f'api_keys: {st.session_state.model_config["api_keys"][:10] + "..."}')
+            _key = st.session_state.model_config.get("api_keys") or ""
+            st.markdown(f'api_keys: {_key[:10] + "..." if _key else "not set"}')
             model_keys = st.text_input("Enter API Key:",key="model_keys")
             if model_keys:
                 st.session_state.model_config['api_keys'] = model_keys.strip().strip('"\'')
@@ -417,10 +438,14 @@ def sidebar():
             
             # Embedding settings
             st.subheader("Embedding settings")
+            _emb_providers = ["openai_embedding", "gemini_embedding", "openrouter_embedding"]
+            _cur_emb = st.session_state.embedding_config.get('service_provider', 'openai_embedding')
+            if _cur_emb not in _emb_providers:
+                _cur_emb = 'openai_embedding'
             st.session_state.embedding_config['service_provider'] = st.selectbox(
                 "Embedding Provider",
-                ["openai_embedding","gemini_embedding"],
-                index=["openai_embedding","gemini_embedding"].index(st.session_state.embedding_config['service_provider']),
+                _emb_providers,
+                index=_emb_providers.index(_cur_emb),
                 help="Embedding service provider"
             )
             if st.session_state.embedding_config['service_provider'] == 'openai_embedding':
@@ -435,7 +460,14 @@ def sidebar():
                     ["text-embedding-004"],
                     help="Model used for generating embeddings"
                 )
-            st.markdown(f'api_keys: {st.session_state.embedding_config["api_keys"][:10] + "..."}')
+            elif st.session_state.embedding_config['service_provider'] == 'openrouter_embedding':
+                st.session_state.embedding_config['embedding_model_name'] = st.selectbox(
+                    "Embedding Model",
+                    ["openai/text-embedding-3-small", "openai/text-embedding-3-large"],
+                    help="OpenRouter embedding model"
+                )
+            _ekey = st.session_state.embedding_config.get("api_keys") or ""
+            st.markdown(f'api_keys: {_ekey[:10] + "..." if _ekey else "not set"}')
             embedding_keys = st.text_input("Enter API Key:",key="embedding_keys")
             if embedding_keys:
                 st.session_state.embedding_config['api_keys'] = embedding_keys.strip().strip('"\'')

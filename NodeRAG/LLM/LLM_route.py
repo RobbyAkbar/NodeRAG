@@ -1,6 +1,6 @@
 import asyncio
-from .LLM_base import I,O,Dict
-from .LLM import *
+from .LLM_base import I, O, Dict, ModelConfig
+from .LLM import LLM, OPENAI, OpenAI_Embedding, Gemini, Gemini_Embedding, OpenRouter, OpenRouter_Embedding
 
 from ..logging.error import (
     cache_error,
@@ -29,6 +29,10 @@ def LLM_route(config : ModelConfig) -> LLM:
             return Gemini(model_name, api_keys, config)
         case "gemini_embedding":
             return Gemini_Embedding(embedding_model_name, api_keys, config)
+        case "openrouter":
+            return OpenRouter(model_name, api_keys, config)
+        case "openrouter_embedding":
+            return OpenRouter_Embedding(embedding_model_name, api_keys, config)
         case _:
             raise ValueError("Service provider not supported")
    

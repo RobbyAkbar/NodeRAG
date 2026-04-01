@@ -31,12 +31,15 @@ def filter_nodes(graph,nodes_num=2000):
         for i in range(len(nodes)):
             for j in range(i+1,len(nodes)):
                 if not nx.has_path(subgraph,nodes[i],nodes[j]):
-                    path_length,path_nodes = nx.bidirectional_dijkstra(graph,nodes[i],nodes[j])
-                    additional_nodes.update(set(path_nodes))
+                    try:
+                        path_length,path_nodes = nx.bidirectional_dijkstra(graph,nodes[i],nodes[j])
+                        additional_nodes.update(set(path_nodes))
+                    except (nx.NetworkXNoPath, nx.NodeNotFound):
+                        pass
         final_nodes = set(nodes) | additional_nodes
         subgraph = graph.subgraph(final_nodes).copy()
                     
-    console.print(f"final nodes: {len(final_nodes)}")
+    console.print(f"final nodes: {len(subgraph.nodes)}")
     weighted_nodes = {node:score for node,score in page_rank}
     return subgraph,weighted_nodes
 
